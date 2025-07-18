@@ -12,32 +12,17 @@ on:
 jobs:
   push:
     runs-on: ubuntu-latest
-    # 关键权限设置（必须添加）
     permissions:
-      contents: write  # 允许写入仓库
-      pull-requests: write  # 如果需要操作PR
+      contents: write  # 必须要有
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
           ref: ${{ github.ref_name }}
-          token: ${{ secrets.GITHUB_TOKEN }}  # 显式传递token
+          token: ${{ secrets.GITHUB_TOKEN }}  # 关键点1：显式传递token
 
-      # 其他步骤（保持你的原有步骤）...
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.13'
-
-      - name: Install dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y ffmpeg
-          pip install pipenv
-          pipenv install --deploy
-
-      - name: Run update script
-        run: pipenv run dev
+      # 你的其他步骤（安装Python、依赖等）...
+      # ...
 
       - name: Commit and push changes
         run: |
@@ -51,6 +36,6 @@ jobs:
           # 检查是否有变更
           if ! git diff --staged --quiet; then
             git commit -m "Auto Update: $(date '+%Y-%m-%d %H:%M:%S')"
-            # 使用带token的推送命令（关键修改）
+            # 关键点2：使用完整认证URL推送
             git push "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" HEAD:${{ github.ref_name }} --force
           fi
