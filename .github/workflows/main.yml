@@ -11,63 +11,46 @@ on:
 
 jobs:
   push:
-    runs-on: ${{ matrix.operating-system }}
-    permissions:  # 新增权限设置
+    runs-on: ubuntu-latest
+    # 关键权限设置（必须添加）
+    permissions:
       contents: write  # 允许写入仓库
-    strategy:
-      matrix:
-        operating-system: [ 'ubuntu-latest' ]
+      pull-requests: write  # 如果需要操作PR
     steps:
-      - name: Set branch name
-        id: vars
-        run: echo "BRANCH_NAME=${{ github.repository_owner == 'Guovin' && 'gd' || 'master' }}" >> $GITHUB_ENV
-      - uses: actions/checkout@v3
+      - name: Checkout code
+        uses: actions/checkout@v4
         with:
-          ref: ${{ env.BRANCH_NAME }}
-          # 新增 token 设置
-          token: ${{ secrets.GITHUB_TOKEN }}
-      - name: Run with setup-python 3.13
+          ref: ${{ github.ref_name }}
+          token: ${{ secrets.GITHUB_TOKEN }}  # 显式传递token
+
+      # 其他步骤（保持你的原有步骤）...
+      - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.13'
-          update-environment: true
-          cache: 'pipenv'
-      - name: Check open_driver config
-        id: check_driver
+
+      - name: Install dependencies
         run: |
-          echo "OPEN_DRIVER=$(python -c '
-          try:
-            from utils.config import config
-            open_driver = config.open_driver
-          except:
-            open_driver = False
-          print(open_driver)')" >> $GITHUB_ENV
-      - name: Set up Chrome
-        if: env.OPEN_DRIVER == 'True'
-        uses: browser-actions/setup-chrome@latest
-        with:
-          chrome-version: stable
-      - name: Download chrome driver
-        if: env.OPEN_DRIVER == 'True'
-        uses: nanasess/setup-chromedriver@master
-      - name: Install FFmpeg
-        run: sudo apt-get update && sudo apt-get install -y ffmpeg
-      - name: Install pipenv
-        run: pip3 install --user pipenv
-      - name: Install dependecies
-        run: pipenv --python 3.13 && pipenv install --deploy
-      - name: Install selenium
-        if: env.OPEN_DRIVER == 'True'
-        run: pipenv install selenium
-      - name: Update
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+          pip install pipenv
+          pipenv install --deploy
+
+      - name: Run update script
         run: pipenv run dev
-      - name: Commit and push if changed
+
+      - name: Commit and push changes
         run: |
-          git config --local user.email "github-actions[bot]@users.noreply.github.com"
-          git config --local user.name "github-actions[bot]"
+          # 配置Git身份
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git config --global user.name "github-actions[bot]"
+          
+          # 添加所有更改
           git add .
+          
+          # 检查是否有变更
           if ! git diff --staged --quiet; then
-            git commit -m "Github Action Auto Updated"
-            # 修改后的 push 命令，使用 GITHUB_TOKEN
-            git push "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" HEAD:${{ env.BRANCH_NAME }} --force
+            git commit -m "Auto Update: $(date '+%Y-%m-%d %H:%M:%S')"
+            # 使用带token的推送命令（关键修改）
+            git push "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" HEAD:${{ github.ref_name }} --force
           fi
